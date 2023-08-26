@@ -10,14 +10,16 @@
 
 #include "gtest/gtest.h"
 
+#include <any>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <unordered_map>
 
 template <typename Key = char>
 class TrieNode {
 public:
-  TrieNode(bool hasValue = false) : hasValue_(hasValue) {}
+  TrieNode() = default;
 
   TrieNode(const TrieNode &) = delete;
 
@@ -25,16 +27,17 @@ public:
   operator=(const TrieNode &) -> TrieNode & = delete;
 
   TrieNode(TrieNode &&) noexcept = default;
-  TrieNode(TrieNode &&other, bool hasValue)
-      : hasValue_(hasValue), children_(std::move(other.children_)) {}
 
   auto
   operator=(TrieNode &&) noexcept -> TrieNode & = default;
 
-  bool hasValue_;
+  [[nodiscard]] inline auto
+  HasValue() const -> bool {
+    return value_.type() != typeid(std::nullopt_t);
+  }
 
   inline auto
-  GetChildUnmanaged(Key key) -> TrieNode * {
+  GetChild(Key key) -> TrieNode * {
     auto childIter = children_.find(key);
     if (childIter == children_.end()) {
       return nullptr;
@@ -43,52 +46,28 @@ public:
   }
 
   inline auto
-  GetChildMut(Key key) -> std::unique_ptr<TrieNode> * {
-    auto childIter = children_.find(key);
-    if (childIter == children_.end()) {
-      return nullptr;
-    }
-    return &childIter->second;
-  }
-
-  inline auto
-  CreateChild(Key key) -> std::unique_ptr<TrieNode> * {
+  CreateChild(Key key) -> TrieNode * {
     children_.emplace(key, std::make_unique<TrieNode>());
-    return &children_.at(key);
+    return children_.at(key).get();
   }
 
   inline auto
-  GetOrCreateChildMut(Key key) -> std::unique_ptr<TrieNode> * {
-    if (auto child = GetChildMut(key); child != nullptr) {
+  GetOrCreateChild(Key key) -> TrieNode * {
+    if (auto child = GetChild(key); child != nullptr) {
       return child;
     }
     return CreateChild(key);
   }
 
-protected:
+  template <typename Value>
+  inline auto
+  AddValue(const Value &value) -> void {
+    value_ = value;
+  }
+
+  std::any value_ = std::nullopt;
   std::unordered_map<Key, std::unique_ptr<TrieNode>> children_;
-};
-
-template <typename Key, typename Value>
-class TrieNodeWithValue : public TrieNode<Key> {
-public:
-  TrieNodeWithValue(Value value) : TrieNode<Key>(true), value_(value) {}
-
-  TrieNodeWithValue(const TrieNodeWithValue &) = delete;
-
-  auto
-  operator=(const TrieNodeWithValue &) -> TrieNodeWithValue & = delete;
-
-  TrieNodeWithValue(TrieNodeWithValue &&) noexcept = default;
-
-  TrieNodeWithValue(std::unique_ptr<TrieNode<Key>> promoteNode, Value value)
-      : TrieNode<Key>(std::move(*promoteNode), true),
-        value_(std::move(value)) {}
-
-  auto
-  operator=(TrieNodeWithValue &&) noexcept -> TrieNodeWithValue & = default;
-
-  Value value_;
+  TrieNode *fail_ = nullptr;
 };
 
 template <typename Key = char, typename Container = std::string>
@@ -107,16 +86,14 @@ public:
   template <typename Value>
   auto
   Insert(const Container &cont, const Value &value) -> void {
-    auto iter = &root_;
+    auto iter = root_.get();
     for (auto &&key : cont) {
-      iter = (*iter)->GetOrCreateChildMut(key);
+      iter = iter->GetOrCreateChild(key);
     }
-    if ((*iter)->hasValue_) {
+    if (iter->HasValue()) {
       throw std::runtime_error("Duplicate key");
     }
-
-    *iter = std::make_unique<TrieNodeWithValue<Key, Value>>(std::move(*iter),
-                                                            value);
+    iter->AddValue(value);
   }
 
   template <typename Value>
@@ -124,27 +101,59 @@ public:
   Lookup(const Container &cont) -> std::optional<Value> {
     auto iterator = root_.get();
     for (auto &&key : cont) {
-      iterator = iterator->GetChildUnmanaged(key);
+      iterator = iterator->GetChild(key);
       if (iterator == nullptr) {
         return std::nullopt;
       }
     }
-    if (!iterator->hasValue_) {
+    if (!iterator->HasValue()) {
       return std::nullopt;
     }
-    return static_cast<TrieNodeWithValue<Key, Value> *>(iterator)->value_;
+    return std::any_cast<Value>(iterator->value_);
   }
 
   auto
   StartWith(const Container &cont) -> bool {
     auto iterator = root_.get();
     for (auto &&key : cont) {
-      iterator = iterator->GetChildUnmanaged(key);
+      iterator = iterator->GetChild(key);
       if (iterator == nullptr) {
         return false;
       }
     }
     return true;
+  }
+
+  void
+  BuildFailPtr() {
+    std::queue<TrieNode<Key> *> nodeQueue;
+    PushChildren(root_.get(), nodeQueue);
+    while (!nodeQueue.empty()) {
+      auto node = nodeQueue.front();
+      nodeQueue.pop();
+      for (auto &&[key, child] : node->children_) {
+        child->fail_ = BuildNodeFailPtr(key, node);
+        PushChildren(child.get(), nodeQueue);
+      }
+    }
+  }
+
+  void
+  PushChild(TrieNode<Key> *node, std::queue<TrieNode<Key> *> &nodeQueue) {
+    for (auto &&[key, child] : node->children_) {
+      nodeQueue.push(child.get());
+    }
+  }
+
+  auto
+  BuildNodeFailPtr(Key key, TrieNode<Key> *node) -> TrieNode<Key> * {
+    for (auto fail = node->fail_; fail != nullptr; fail = fail->fail_) {
+      auto failChild = fail->GetChild(key);
+      if (failChild != nullptr) {
+        return failChild;
+      }
+    }
+    return root_.get();
   }
 
 private:
@@ -155,5 +164,6 @@ private:
 TEST(ACAutomaton, Trie) {
   Trie<char, std::string> trie;
   std::string str = "apple";
-  EXPECT_EQ(trie.Lookup<std::string>("hello"), str);
+  trie.Insert(str, str);
+  EXPECT_EQ(trie.Lookup<std::string>("apple"), str);
 }
