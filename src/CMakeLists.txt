@@ -5,7 +5,7 @@ include(GoogleTest)
 add_custom_target(build-tests COMMAND ${CMAKE_CTEST_COMMAND} --show-only)
 add_custom_target(check-tests COMMAND ${CMAKE_CTEST_COMMAND} --verbose)
 
-file(GLOB_RECURSE PIGSKINJELLY_TEST_SOURCES "${PROJECT_SOURCE_DIR}/src/*/*test.cc")
+file(GLOB_RECURSE PIGSKINJELLY_TEST_SOURCES ${TEST_SOURCES_PATTERN})
 
 message(STATUS "Found ${PIGSKINJELLY_TEST_SOURCES} test sources: ${PROJECT_SOURCE_DIR}/test/")
 
