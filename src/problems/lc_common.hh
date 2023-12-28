@@ -27,4 +27,11 @@
 
 using namespace std;
 
+#define LEETCODE_SOLUTION(ret, ...) \
+class Solution {\
+public: \
+  auto solve(__VA_ARGS__) -> ret; \
+};\
+auto Solution::solve(__VA_ARGS__) -> ret
+
 #endif // SRC_PROBLEMS_LC_COMMON_HH
