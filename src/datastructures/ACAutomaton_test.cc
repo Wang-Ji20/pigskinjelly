@@ -147,6 +147,7 @@ public:
 
   auto
   BuildNodeFailPtr(Key key, TrieNode<Key> *node) -> TrieNode<Key> * {
+    // iterate, decrease one prefix per iteration, to find text with max prefix-suffix overlapping
     for (auto fail = node->fail_; fail != nullptr; fail = fail->fail_) {
       auto failChild = fail->GetChild(key);
       if (failChild != nullptr) {
