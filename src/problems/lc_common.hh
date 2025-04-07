@@ -11,12 +11,14 @@
 #ifndef SRC_PROBLEMS_LC_COMMON_HH
 #define SRC_PROBLEMS_LC_COMMON_HH
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cstddef> // size_t
 #include <cstdint> // int32_t
+#include <functional>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -25,7 +27,6 @@
 #include <utility> // pair, move
 #include <variant>
 #include <vector>
-#include <numeric>
 using namespace std;
 
 #define LEETCODE_SOLUTION(ret, ...)                                            \
@@ -33,6 +34,6 @@ using namespace std;
   public:                                                                      \
     auto solve(__VA_ARGS__) -> ret;                                            \
   };                                                                           \
-  auto Solution::solve(__VA_ARGS__)->ret
+  auto Solution::solve(__VA_ARGS__) -> ret
 
 #endif // SRC_PROBLEMS_LC_COMMON_HH
