@@ -15,11 +15,13 @@
 #include <array>
 #include <cstddef> // size_t
 #include <cstdint> // int32_t
+#include <deque>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <queue>
 #include <string>
 #include <tuple>
 #include <unordered_map>
